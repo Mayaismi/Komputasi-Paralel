@@ -1,0 +1,118 @@
+package komputasi_paralel;
+
+import java.util.concurrent.*;
+
+public class TotalBelanjaParalel {
+
+    static int[] harga = {
+        12000, 8000, 15000, 20000,
+        10000, 5000, 18000, 7000
+    };
+
+    // Menghitung total secara biasa
+    static long sekuensial() {
+        long total = 0;
+
+        for (int i = 0; i < harga.length; i++) {
+            total += harga[i];
+        }
+
+        return total;
+    }
+
+    // Menghitung sebagian data
+    static class Hitung implements Callable<Long> {
+
+        int awal, akhir;
+
+        Hitung(int awal, int akhir) {
+            this.awal = awal;
+            this.akhir = akhir;
+        }
+
+        public Long call() {
+            long jumlah = 0;
+
+            for (int i = awal; i < akhir; i++) {
+                jumlah += harga[i];
+            }
+
+            return jumlah;
+        }
+    }
+
+    // Menghitung total secara paralel
+    static long paralel() throws Exception {
+
+        int jumlahThread = Math.min(
+                Runtime.getRuntime().availableProcessors(),
+                harga.length
+        );
+
+        ExecutorService executor
+                = Executors.newFixedThreadPool(jumlahThread);
+
+        try {
+            Future<Long>[] hasil = new Future[jumlahThread];
+
+            int ukuran = (harga.length + jumlahThread - 1)
+                    / jumlahThread;
+
+            for (int i = 0; i < jumlahThread; i++) {
+                int awal = i * ukuran;
+                int akhir = Math.min(awal + ukuran, harga.length);
+
+                if (awal < harga.length) {
+                    hasil[i] = executor.submit(
+                            new Hitung(awal, akhir)
+                    );
+                }
+            }
+
+            long total = 0;
+
+            for (int i = 0; i < jumlahThread; i++) {
+                if (hasil[i] != null) {
+                    total += hasil[i].get();
+                }
+            }
+
+            return total;
+
+        } finally {
+            executor.shutdown();
+        }
+    }
+
+    // Program utama
+    public static void main(String[] args) throws Exception {
+
+        long mulai = System.nanoTime();
+        long total1 = sekuensial();
+        long selesai = System.nanoTime();
+
+        double waktu1 = (selesai - mulai) / 1_000_000.0;
+
+        mulai = System.nanoTime();
+        long total2 = paralel();
+        selesai = System.nanoTime();
+
+        double waktu2 = (selesai - mulai) / 1_000_000.0;
+
+        System.out.println("=== TOTAL BELANJA ===");
+        System.out.println("Jumlah barang: " + harga.length);
+
+        System.out.println("Total Sekuensial: Rp" + total1);
+        System.out.println("Total Paralel: Rp" + total2);
+
+        System.out.println("Hasil sama: " + (total1 == total2));
+
+        System.out.printf("Waktu Sekuensial: %.4f ms%n", waktu1);
+        System.out.printf("Waktu Paralel: %.4f ms%n", waktu2);
+
+        if (waktu2 > 0) {
+            double speedup = waktu1 / waktu2;
+            System.out.printf("Speedup: %.2f kali%n", speedup);
+        }
+    }
+}
